@@ -1,11 +1,25 @@
-import { useEffect, useState } from 'react';
-import { supabase, Transaction, User } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import { TrendingUp, TrendingDown, DollarSign, Clock, Plus, CheckCircle, XCircle } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { supabase, Transaction, User } from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Clock,
+  Plus,
+  CheckCircle,
+} from "lucide-react";
 
-export default function Dashboard({ onNavigate }: { onNavigate: (page: string) => void }) {
+export default function Dashboard({
+  onNavigate,
+}: {
+  onNavigate: (page: string) => void;
+}) {
   const { isOfficer } = useAuth();
-  const [transactions, setTransactions] = useState<(Transaction & { creator: User })[]>([]);
+  // We add 'approver' to the state type
+  const [transactions, setTransactions] = useState<
+    (Transaction & { creator: User; approver?: User })[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalBalance: 0,
@@ -21,11 +35,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
   }, []);
 
   const loadData = async () => {
+    // UPDATED QUERY: Fetch 'approver' details
     const { data: transactionData } = await supabase
-      .from('transactions')
-      .select('*, creator:users!created_by(*)')
-      .eq('status', 'approved')
-      .order('created_at', { ascending: false })
+      .from("transactions")
+      .select("*, creator:users!created_by(*), approver:users!approved_by(*)")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false })
       .limit(10);
 
     if (transactionData) {
@@ -42,9 +57,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
       const totalBalance = totalIncome - totalExpense;
 
       const { count } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+        .from("transactions")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
 
       setStats({
         totalBalance,
@@ -58,17 +73,17 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: "PHP",
     }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   };
 
@@ -83,10 +98,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Organization Dashboard</h2>
+        <h2 className="text-2xl font-bold text-gray-900">
+          Organization Dashboard
+        </h2>
         {isOfficer && (
           <button
-            onClick={() => onNavigate('transactions')}
+            onClick={() => onNavigate("transactions")}
             className="bg-maroon-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-maroon-700 transition flex items-center space-x-2"
           >
             <Plus className="w-5 h-5" />
@@ -103,7 +120,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
             </div>
           </div>
           <p className="text-sm text-gray-600 mb-1">Total Balance</p>
-          <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalBalance)}</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {formatCurrency(stats.totalBalance)}
+          </p>
         </div>
 
         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
@@ -113,7 +132,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
             </div>
           </div>
           <p className="text-sm text-gray-600 mb-1">Total Income</p>
-          <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.totalIncome)}</p>
+          <p className="text-2xl font-bold text-green-600">
+            {formatCurrency(stats.totalIncome)}
+          </p>
         </div>
 
         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
@@ -123,7 +144,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
             </div>
           </div>
           <p className="text-sm text-gray-600 mb-1">Total Expenses</p>
-          <p className="text-2xl font-bold text-red-600">{formatCurrency(stats.totalExpense)}</p>
+          <p className="text-2xl font-bold text-red-600">
+            {formatCurrency(stats.totalExpense)}
+          </p>
         </div>
 
         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
@@ -133,13 +156,17 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
             </div>
           </div>
           <p className="text-sm text-gray-600 mb-1">Pending Approval</p>
-          <p className="text-2xl font-bold text-yellow-600">{stats.pendingCount}</p>
+          <p className="text-2xl font-bold text-yellow-600">
+            {stats.pendingCount}
+          </p>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
         <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Recent Transactions
+          </h3>
         </div>
         <div className="divide-y divide-gray-200">
           {transactions.length === 0 ? (
@@ -148,16 +175,23 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
             </div>
           ) : (
             transactions.map((transaction) => (
-              <div key={transaction.id} className="p-6 hover:bg-gray-50 transition">
+              <div
+                key={transaction.id}
+                className="p-6 hover:bg-gray-50 transition"
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-2">
-                      <h4 className="font-semibold text-gray-900">{transaction.title}</h4>
+                      <h4 className="font-semibold text-gray-900">
+                        {transaction.title}
+                      </h4>
                       <span className="px-2 py-1 bg-maroon-50 text-maroon-700 text-xs font-medium rounded">
                         {transaction.category}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">{transaction.description}</p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {transaction.description}
+                    </p>
                     <div className="flex items-center space-x-4 text-xs text-gray-500">
                       <span>{formatDate(transaction.date)}</span>
                       <span>By {transaction.creator?.full_name}</span>
@@ -166,15 +200,27 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
                   <div className="text-right ml-4">
                     <p
                       className={`text-xl font-bold ${
-                        transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                        transaction.amount > 0
+                          ? "text-green-600"
+                          : "text-red-600"
                       }`}
                     >
-                      {transaction.amount > 0 ? '+' : ''}
+                      {transaction.amount > 0 ? "+" : ""}
                       {formatCurrency(transaction.amount)}
                     </p>
-                    <div className="mt-1 flex items-center justify-end space-x-1">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                      <span className="text-xs text-green-600">Approved</span>
+                    {/* ADDED APPROVER DISPLAY */}
+                    <div className="mt-1 flex flex-col items-end">
+                      <div className="flex items-center space-x-1">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <span className="text-xs text-green-600 font-medium">
+                          Approved
+                        </span>
+                      </div>
+                      {transaction.approver && (
+                        <span className="text-[10px] text-gray-400">
+                          by {transaction.approver.full_name}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -185,7 +231,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (page: string) =
         {transactions.length > 0 && (
           <div className="p-4 border-t border-gray-200 bg-gray-50">
             <button
-              onClick={() => onNavigate('transactions')}
+              onClick={() => onNavigate("transactions")}
               className="text-maroon-600 hover:text-maroon-700 font-medium text-sm"
             >
               View all transactions →

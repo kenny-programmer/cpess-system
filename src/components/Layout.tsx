@@ -1,5 +1,5 @@
-import { ReactNode, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { ReactNode, useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import {
   LayoutDashboard,
   Receipt,
@@ -7,8 +7,8 @@ import {
   Shield,
   LogOut,
   Menu,
-  X
-} from 'lucide-react';
+  X,
+} from "lucide-react";
 
 type LayoutProps = {
   children: ReactNode;
@@ -16,20 +16,39 @@ type LayoutProps = {
   onNavigate: (page: string) => void;
 };
 
-export default function Layout({ children, currentPage, onNavigate }: LayoutProps) {
+export default function Layout({
+  children,
+  currentPage,
+  onNavigate,
+}: LayoutProps) {
   const { user, signOut, isAdmin } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'transactions', label: 'Transactions', icon: Receipt },
-    { id: 'reports', label: 'Reports', icon: BarChart3 },
-    ...(isAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: Shield }] : []),
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "transactions", label: "Transactions", icon: Receipt },
+    { id: "reports", label: "Reports", icon: BarChart3 },
+    ...(isAdmin ? [{ id: "admin", label: "Admin Panel", icon: Shield }] : []),
   ];
 
   const handleSignOut = async () => {
     await signOut();
   };
+
+  // --- LOGIC TO GET NAME AND ROLE SAFELY ---
+
+  // 1. Try database name, fallback to email, then 'User'
+  // (We removed user_metadata to fix the TypeScript error)
+  const displayName = user?.full_name || user?.email?.split("@")[0] || "User";
+
+  // 2. Determine the subtitle (Role/Position)
+  let roleLabel = "Member";
+  if (isAdmin || user?.role === "admin") {
+    roleLabel = "Administrator";
+  } else if (user?.role === "officer") {
+    roleLabel = user.officer_position || "Officer";
+  }
+  // -----------------------------------------
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -37,7 +56,9 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold text-maroon-600">CPESS Finance</h1>
+              <h1 className="text-xl font-bold text-maroon-600">
+                CPESS Finance
+              </h1>
             </div>
 
             <div className="hidden md:flex items-center space-x-1">
@@ -49,8 +70,8 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
                     onClick={() => onNavigate(item.id)}
                     className={`px-4 py-2 rounded-lg font-medium transition flex items-center space-x-2 ${
                       currentPage === item.id
-                        ? 'bg-maroon-50 text-maroon-600'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? "bg-maroon-50 text-maroon-600"
+                        : "text-gray-600 hover:bg-gray-50"
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -60,16 +81,16 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
               })}
             </div>
 
+            {/* DESKTOP PROFILE SECTION */}
             <div className="hidden md:flex items-center space-x-4">
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user?.full_name}</p>
-                <p className="text-xs text-gray-500">
-                  {user?.role === 'officer' ? user.officer_position || 'Officer' : 'Member'}
-                </p>
+                <p className="text-sm font-bold text-gray-900">{displayName}</p>
+                <p className="text-xs text-gray-500 font-medium">{roleLabel}</p>
               </div>
               <button
                 onClick={handleSignOut}
                 className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                title="Sign Out"
               >
                 <LogOut className="w-5 h-5" />
               </button>
@@ -79,11 +100,16 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
             </button>
           </div>
         </div>
 
+        {/* MOBILE MENU */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white">
             <div className="px-4 py-3 space-y-1">
@@ -98,8 +124,8 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
                     }}
                     className={`w-full px-4 py-3 rounded-lg font-medium transition flex items-center space-x-3 ${
                       currentPage === item.id
-                        ? 'bg-maroon-50 text-maroon-600'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? "bg-maroon-50 text-maroon-600"
+                        : "text-gray-600 hover:bg-gray-50"
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -109,9 +135,11 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
               })}
               <div className="pt-3 border-t border-gray-200">
                 <div className="px-4 py-2">
-                  <p className="text-sm font-medium text-gray-900">{user?.full_name}</p>
-                  <p className="text-xs text-gray-500">
-                    {user?.role === 'officer' ? user.officer_position || 'Officer' : 'Member'}
+                  <p className="text-sm font-bold text-gray-900">
+                    {displayName}
+                  </p>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {roleLabel}
                   </p>
                 </div>
                 <button
@@ -134,7 +162,7 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
       <footer className="bg-white border-t border-gray-200 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <p className="text-center text-sm text-gray-600">
-            Created by{' '}
+            Created by{" "}
             <a
               href="https://victorroxas.vercel.app/"
               target="_blank"

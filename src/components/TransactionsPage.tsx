@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
-import { supabase, Transaction, User, AuditLog, TransactionRevision } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { useEffect, useState } from "react";
+import {
+  supabase,
+  Transaction,
+  User,
+  TransactionRevision,
+} from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
 import {
   Plus,
-  Filter,
   Search,
   CheckCircle,
   XCircle,
@@ -14,38 +18,53 @@ import {
   History,
   X,
   Upload,
-  FileText
-} from 'lucide-react';
+} from "lucide-react";
 
 type TransactionWithCreator = Transaction & { creator: User; approver?: User };
 
 export default function TransactionsPage() {
   const { user, isOfficer } = useAuth();
-  const [transactions, setTransactions] = useState<TransactionWithCreator[]>([]);
-  const [filteredTransactions, setFilteredTransactions] = useState<TransactionWithCreator[]>([]);
+  const [transactions, setTransactions] = useState<TransactionWithCreator[]>(
+    []
+  );
+  const [filteredTransactions, setFilteredTransactions] = useState<
+    TransactionWithCreator[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithCreator | null>(null);
-  const [revisions, setRevisions] = useState<(TransactionRevision & { reviser: User })[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<TransactionWithCreator | null>(null);
+  const [revisions, setRevisions] = useState<
+    (TransactionRevision & { reviser: User })[]
+  >([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "pending" | "approved" | "rejected"
+  >("all");
 
-  const categories = ['Event', 'Materials', 'Fundraising', 'Supplies', 'Transportation', 'Other'];
+  const categories = [
+    "Event",
+    "Materials",
+    "Fundraising",
+    "Supplies",
+    "Transportation",
+    "Other",
+  ];
 
   const [formData, setFormData] = useState({
-    title: '',
-    amount: '',
+    title: "",
+    amount: "",
     category: categories[0],
-    description: '',
-    date: new Date().toISOString().split('T')[0],
+    description: "",
+    date: new Date().toISOString().split("T")[0],
     proofImage: null as File | null,
-    proofImageUrl: '',
+    proofImageUrl: "",
   });
 
-  const [editReason, setEditReason] = useState('');
+  const [editReason, setEditReason] = useState("");
 
   useEffect(() => {
     loadTransactions();
@@ -57,9 +76,9 @@ export default function TransactionsPage() {
 
   const loadTransactions = async () => {
     const { data } = await supabase
-      .from('transactions')
-      .select('*, creator:users!created_by(*), approver:users!approved_by(*)')
-      .order('created_at', { ascending: false });
+      .from("transactions")
+      .select("*, creator:users!created_by(*), approver:users!approved_by(*)")
+      .order("created_at", { ascending: false });
 
     if (data) {
       setTransactions(data as any);
@@ -70,7 +89,7 @@ export default function TransactionsPage() {
   const filterTransactions = () => {
     let filtered = transactions;
 
-    if (statusFilter !== 'all') {
+    if (statusFilter !== "all") {
       filtered = filtered.filter((t) => t.status === statusFilter);
     }
 
@@ -87,17 +106,19 @@ export default function TransactionsPage() {
   };
 
   const uploadImage = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
+    const fileExt = file.name.split(".").pop();
     const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `transaction-proofs/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('transaction-images')
+      .from("transaction-images")
       .upload(filePath, file);
 
     if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage.from('transaction-images').getPublicUrl(filePath);
+    const { data } = supabase.storage
+      .from("transaction-images")
+      .getPublicUrl(filePath);
 
     return data.publicUrl;
   };
@@ -105,6 +126,23 @@ export default function TransactionsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    // --- STRICT VALIDATION START ---
+    if (
+      !formData.title ||
+      !formData.amount ||
+      !formData.date ||
+      !formData.description
+    ) {
+      alert("Please fill in all fields.");
+      return;
+    }
+
+    if (!formData.proofImage) {
+      alert("A Proof Image is required to submit a transaction.");
+      return;
+    }
+    // --- STRICT VALIDATION END ---
 
     try {
       let proofUrl = formData.proofImageUrl;
@@ -114,7 +152,7 @@ export default function TransactionsPage() {
       }
 
       const { data, error } = await supabase
-        .from('transactions')
+        .from("transactions")
         .insert({
           title: formData.title,
           amount: parseFloat(formData.amount),
@@ -123,16 +161,16 @@ export default function TransactionsPage() {
           date: formData.date,
           proof_image_url: proofUrl,
           created_by: user.id,
-          status: 'pending',
+          status: "pending",
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      await supabase.from('audit_logs').insert({
-        action_type: 'created',
-        entity_type: 'transaction',
+      await supabase.from("audit_logs").insert({
+        action_type: "created",
+        entity_type: "transaction",
         entity_id: data.id,
         user_id: user.id,
         changes: { transaction: data },
@@ -142,15 +180,15 @@ export default function TransactionsPage() {
       setShowAddModal(false);
       loadTransactions();
     } catch (error) {
-      console.error('Error creating transaction:', error);
-      alert('Failed to create transaction');
+      console.error("Error creating transaction:", error);
+      alert("Failed to create transaction. Check console for details.");
     }
   };
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !selectedTransaction || !editReason.trim()) {
-      alert('Please provide a reason for this edit');
+      alert("Please provide a reason for this edit");
       return;
     }
 
@@ -161,7 +199,7 @@ export default function TransactionsPage() {
         proofUrl = await uploadImage(formData.proofImage);
       }
 
-      await supabase.from('transaction_revisions').insert({
+      await supabase.from("transaction_revisions").insert({
         transaction_id: selectedTransaction.id,
         title: selectedTransaction.title,
         amount: selectedTransaction.amount,
@@ -184,15 +222,15 @@ export default function TransactionsPage() {
       };
 
       const { error } = await supabase
-        .from('transactions')
+        .from("transactions")
         .update(updates)
-        .eq('id', selectedTransaction.id);
+        .eq("id", selectedTransaction.id);
 
       if (error) throw error;
 
-      await supabase.from('audit_logs').insert({
-        action_type: 'updated',
-        entity_type: 'transaction',
+      await supabase.from("audit_logs").insert({
+        action_type: "updated",
+        entity_type: "transaction",
         entity_id: selectedTransaction.id,
         user_id: user.id,
         changes: { before: selectedTransaction, after: updates },
@@ -201,26 +239,29 @@ export default function TransactionsPage() {
 
       resetForm();
       setShowEditModal(false);
-      setEditReason('');
+      setEditReason("");
       loadTransactions();
     } catch (error) {
-      console.error('Error updating transaction:', error);
-      alert('Failed to update transaction');
+      console.error("Error updating transaction:", error);
+      alert("Failed to update transaction");
     }
   };
 
   const handleDelete = async (transaction: TransactionWithCreator) => {
     if (!user) return;
-    if (!confirm('Are you sure you want to delete this transaction?')) return;
+    if (!confirm("Are you sure you want to delete this transaction?")) return;
 
     try {
-      const { error } = await supabase.from('transactions').delete().eq('id', transaction.id);
+      const { error } = await supabase
+        .from("transactions")
+        .delete()
+        .eq("id", transaction.id);
 
       if (error) throw error;
 
-      await supabase.from('audit_logs').insert({
-        action_type: 'deleted',
-        entity_type: 'transaction',
+      await supabase.from("audit_logs").insert({
+        action_type: "deleted",
+        entity_type: "transaction",
         entity_id: transaction.id,
         user_id: user.id,
         changes: { transaction },
@@ -228,91 +269,109 @@ export default function TransactionsPage() {
 
       loadTransactions();
     } catch (error) {
-      console.error('Error deleting transaction:', error);
-      alert('Failed to delete transaction');
+      console.error("Error deleting transaction:", error);
+      alert("Failed to delete transaction");
     }
   };
 
   const handleApprove = async (transaction: TransactionWithCreator) => {
     if (!user) return;
 
-    const canApprove = ['President', 'VP Internal', 'VP External'].includes(user.officer_position || '');
+    const isAuthorized =
+      user.role === "admin" ||
+      [
+        "President",
+        "VP Internal",
+        "VP External",
+        "Treasurer",
+        "Assistant Treasurer",
+        "Auditor",
+      ].includes(user.officer_position || "");
 
-    if (!canApprove) {
-      alert('Only President or Vice Presidents can approve transactions');
+    if (!isAuthorized) {
+      alert("You do not have permission to approve transactions.");
       return;
     }
 
     try {
       const { error } = await supabase
-        .from('transactions')
+        .from("transactions")
         .update({
-          status: 'approved',
+          status: "approved",
           approved_by: user.id,
           approved_at: new Date().toISOString(),
         })
-        .eq('id', transaction.id);
+        .eq("id", transaction.id);
 
       if (error) throw error;
 
-      await supabase.from('audit_logs').insert({
-        action_type: 'approved',
-        entity_type: 'transaction',
+      await supabase.from("audit_logs").insert({
+        action_type: "approved",
+        entity_type: "transaction",
         entity_id: transaction.id,
         user_id: user.id,
-        changes: { status: 'approved' },
+        changes: { status: "approved" },
       });
 
       loadTransactions();
     } catch (error) {
-      console.error('Error approving transaction:', error);
-      alert('Failed to approve transaction');
+      console.error("Error approving transaction:", error);
+      alert("Failed to approve transaction");
     }
   };
 
   const handleReject = async (transaction: TransactionWithCreator) => {
     if (!user) return;
 
-    const canApprove = ['President', 'VP Internal', 'VP External'].includes(user.officer_position || '');
+    const isAuthorized =
+      user.role === "admin" ||
+      [
+        "President",
+        "VP Internal",
+        "VP External",
+        "Treasurer",
+        "Assistant Treasurer",
+        "Auditor",
+      ].includes(user.officer_position || "");
 
-    if (!canApprove) {
-      alert('Only President or Vice Presidents can reject transactions');
+    if (!isAuthorized) {
+      alert("You do not have permission to reject transactions.");
       return;
     }
 
     try {
       const { error } = await supabase
-        .from('transactions')
+        .from("transactions")
         .update({
-          status: 'rejected',
+          status: "rejected",
           approved_by: user.id,
           approved_at: new Date().toISOString(),
         })
-        .eq('id', transaction.id);
+        .eq("id", transaction.id);
 
       if (error) throw error;
 
-      await supabase.from('audit_logs').insert({
-        action_type: 'rejected',
-        entity_type: 'transaction',
+      await supabase.from("audit_logs").insert({
+        action_type: "rejected",
+        entity_type: "transaction",
         entity_id: transaction.id,
         user_id: user.id,
-        changes: { status: 'rejected' },
+        changes: { status: "rejected" },
       });
 
       loadTransactions();
     } catch (error) {
-      console.error('Error rejecting transaction:', error);
-      alert('Failed to reject transaction');
+      console.error("Error rejecting transaction:", error);
+      alert("Failed to reject transaction");
     }
   };
 
   const viewHistory = async (transaction: TransactionWithCreator) => {
     const { data } = await supabase
-      .from('transaction_revisions')
-      .select('*, reviser:users!revised_by(*)')
-      .eq('transaction_id', transaction.id)
-      .order('created_at', { ascending: false });
+      .from("transaction_revisions")
+      .select("*, reviser:users!revised_by(*)")
+      .eq("transaction_id", transaction.id)
+      .order("created_at", { ascending: false });
 
     if (data) {
       setRevisions(data as any);
@@ -324,13 +383,13 @@ export default function TransactionsPage() {
 
   const resetForm = () => {
     setFormData({
-      title: '',
-      amount: '',
+      title: "",
+      amount: "",
       category: categories[0],
-      description: '',
-      date: new Date().toISOString().split('T')[0],
+      description: "",
+      date: new Date().toISOString().split("T")[0],
       proofImage: null,
-      proofImageUrl: '',
+      proofImageUrl: "",
     });
   };
 
@@ -349,17 +408,17 @@ export default function TransactionsPage() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: "PHP",
     }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   };
 
@@ -375,7 +434,7 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Transactions</h2>
-        {isOfficer && (
+        {(isOfficer || user?.role === "admin") && (
           <button
             onClick={() => setShowAddModal(true)}
             className="bg-maroon-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-maroon-700 transition flex items-center space-x-2"
@@ -436,7 +495,10 @@ export default function TransactionsPage() {
             <tbody className="divide-y divide-gray-200">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  <td
+                    colSpan={5}
+                    className="px-6 py-12 text-center text-gray-500"
+                  >
                     No transactions found
                   </td>
                 </tr>
@@ -445,41 +507,67 @@ export default function TransactionsPage() {
                   <tr key={transaction.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div>
-                        <p className="font-semibold text-gray-900">{transaction.title}</p>
-                        <p className="text-sm text-gray-600">{transaction.category}</p>
-                        <p className="text-xs text-gray-500 mt-1">By {transaction.creator?.full_name}</p>
+                        <p className="font-semibold text-gray-900">
+                          {transaction.title}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {transaction.category}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          By {transaction.creator?.full_name}
+                        </p>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span
                         className={`font-bold ${
-                          transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                          transaction.amount > 0
+                            ? "text-green-600"
+                            : "text-red-600"
                         }`}
                       >
-                        {transaction.amount > 0 ? '+' : ''}
+                        {transaction.amount > 0 ? "+" : ""}
                         {formatCurrency(transaction.amount)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{formatDate(transaction.date)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {formatDate(transaction.date)}
+                    </td>
                     <td className="px-6 py-4">
-                      {transaction.status === 'pending' && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          <Clock className="w-3 h-3 mr-1" />
-                          Pending
-                        </span>
-                      )}
-                      {transaction.status === 'approved' && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Approved
-                        </span>
-                      )}
-                      {transaction.status === 'rejected' && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          <XCircle className="w-3 h-3 mr-1" />
-                          Rejected
-                        </span>
-                      )}
+                      <div className="flex flex-col">
+                        {transaction.status === "pending" && (
+                          <span className="inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <Clock className="w-3 h-3 mr-1" />
+                            Pending
+                          </span>
+                        )}
+                        {transaction.status === "approved" && (
+                          <>
+                            <span className="inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Approved
+                            </span>
+                            {transaction.approver && (
+                              <span className="text-[10px] text-gray-500 mt-1">
+                                by {transaction.approver.full_name}
+                              </span>
+                            )}
+                          </>
+                        )}
+                        {transaction.status === "rejected" && (
+                          <>
+                            <span className="inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              <XCircle className="w-3 h-3 mr-1" />
+                              Rejected
+                            </span>
+                            {transaction.approver && (
+                              <span className="text-[10px] text-gray-500 mt-1">
+                                by {transaction.approver.full_name}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
@@ -500,24 +588,28 @@ export default function TransactionsPage() {
                         >
                           <History className="w-4 h-4" />
                         </button>
-                        {isOfficer && (
+                        {(isOfficer || user?.role === "admin") && (
                           <>
-                            {transaction.status === 'pending' && (
+                            {transaction.status === "pending" && (
                               <>
-                                <button
-                                  onClick={() => handleApprove(transaction)}
-                                  className="p-1 text-green-600 hover:bg-green-50 rounded"
-                                  title="Approve"
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleReject(transaction)}
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                  title="Reject"
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </button>
+                                {transaction.created_by !== user?.id && (
+                                  <>
+                                    <button
+                                      onClick={() => handleApprove(transaction)}
+                                      className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                      title="Approve"
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleReject(transaction)}
+                                      className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                      title="Reject"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
                               </>
                             )}
                             <button
@@ -550,7 +642,9 @@ export default function TransactionsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
-              <h3 className="text-xl font-bold text-gray-900">Add Transaction</h3>
+              <h3 className="text-xl font-bold text-gray-900">
+                Add Transaction
+              </h3>
               <button
                 onClick={() => {
                   setShowAddModal(false);
@@ -563,11 +657,15 @@ export default function TransactionsPage() {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, title: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent outline-none"
                   required
                 />
@@ -575,22 +673,29 @@ export default function TransactionsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Amount (+ income / - expense)
+                    Amount (+ income / - expense){" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, amount: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent outline-none"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category <span className="text-red-500">*</span>
+                  </label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent outline-none"
                   >
                     {categories.map((cat) => (
@@ -602,20 +707,28 @@ export default function TransactionsPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="date"
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, date: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent outline-none"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description <span className="text-red-500">*</span>
+                </label>
                 <textarea
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   rows={4}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent outline-none"
                   required
@@ -623,7 +736,7 @@ export default function TransactionsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Proof Image (Required)
+                  Proof Image (Required) <span className="text-red-500">*</span>
                 </label>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                   <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
@@ -631,7 +744,10 @@ export default function TransactionsPage() {
                     type="file"
                     accept="image/*"
                     onChange={(e) =>
-                      setFormData({ ...formData, proofImage: e.target.files?.[0] || null })
+                      setFormData({
+                        ...formData,
+                        proofImage: e.target.files?.[0] || null,
+                      })
                     }
                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-maroon-50 file:text-maroon-700 hover:file:bg-maroon-100"
                     required
@@ -665,12 +781,14 @@ export default function TransactionsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
-              <h3 className="text-xl font-bold text-gray-900">Edit Transaction</h3>
+              <h3 className="text-xl font-bold text-gray-900">
+                Edit Transaction
+              </h3>
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   resetForm();
-                  setEditReason('');
+                  setEditReason("");
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -680,7 +798,8 @@ export default function TransactionsPage() {
             <form onSubmit={handleEdit} className="p-6 space-y-4">
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                 <p className="text-sm text-yellow-800">
-                  You must provide a reason for editing this transaction. The original version will be preserved in the revision history.
+                  You must provide a reason for editing this transaction. The
+                  original version will be preserved in the revision history.
                 </p>
               </div>
               <div>
@@ -697,32 +816,44 @@ export default function TransactionsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title
+                </label>
                 <input
                   type="text"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, title: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent outline-none"
                   required
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Amount
+                  </label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, amount: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent outline-none"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category
+                  </label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent outline-none"
                   >
                     {categories.map((cat) => (
@@ -734,20 +865,28 @@ export default function TransactionsPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date
+                </label>
                 <input
                   type="date"
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, date: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent outline-none"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
                 <textarea
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   rows={4}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-transparent outline-none"
                   required
@@ -763,7 +902,10 @@ export default function TransactionsPage() {
                     type="file"
                     accept="image/*"
                     onChange={(e) =>
-                      setFormData({ ...formData, proofImage: e.target.files?.[0] || null })
+                      setFormData({
+                        ...formData,
+                        proofImage: e.target.files?.[0] || null,
+                      })
                     }
                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-maroon-50 file:text-maroon-700 hover:file:bg-maroon-100"
                   />
@@ -781,7 +923,7 @@ export default function TransactionsPage() {
                   onClick={() => {
                     setShowEditModal(false);
                     resetForm();
-                    setEditReason('');
+                    setEditReason("");
                   }}
                   className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-200 transition"
                 >
@@ -797,7 +939,9 @@ export default function TransactionsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
-              <h3 className="text-xl font-bold text-gray-900">Transaction Details</h3>
+              <h3 className="text-xl font-bold text-gray-900">
+                Transaction Details
+              </h3>
               <button
                 onClick={() => setShowViewModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -808,55 +952,72 @@ export default function TransactionsPage() {
             <div className="p-6 space-y-4">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Title</p>
-                <p className="text-lg font-semibold text-gray-900">{selectedTransaction.title}</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {selectedTransaction.title}
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Amount</p>
                   <p
                     className={`text-xl font-bold ${
-                      selectedTransaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                      selectedTransaction.amount > 0
+                        ? "text-green-600"
+                        : "text-red-600"
                     }`}
                   >
-                    {selectedTransaction.amount > 0 ? '+' : ''}
+                    {selectedTransaction.amount > 0 ? "+" : ""}
                     {formatCurrency(selectedTransaction.amount)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Category</p>
-                  <p className="text-lg font-medium text-gray-900">{selectedTransaction.category}</p>
+                  <p className="text-lg font-medium text-gray-900">
+                    {selectedTransaction.category}
+                  </p>
                 </div>
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">Date</p>
-                <p className="text-lg text-gray-900">{formatDate(selectedTransaction.date)}</p>
+                <p className="text-lg text-gray-900">
+                  {formatDate(selectedTransaction.date)}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">Description</p>
-                <p className="text-gray-900">{selectedTransaction.description}</p>
+                <p className="text-gray-900">
+                  {selectedTransaction.description}
+                </p>
               </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Proof Image</p>
-                <img
-                  src={selectedTransaction.proof_image_url}
-                  alt="Proof"
-                  className="w-full rounded-lg border border-gray-200"
-                />
-              </div>
+              <img
+                src={
+                  selectedTransaction.proof_image_url ||
+                  "https://placehold.co/600x400?text=No+Proof"
+                }
+                onError={(e) => {
+                  e.currentTarget.src =
+                    "https://placehold.co/600x400?text=Image+Error";
+                  e.currentTarget.onerror = null; // prevents infinite loop
+                }}
+                alt="Proof"
+                className="w-full rounded-lg border border-gray-200 object-contain max-h-96 bg-gray-50"
+              />
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Created By</p>
-                  <p className="text-gray-900">{selectedTransaction.creator?.full_name}</p>
+                  <p className="text-gray-900">
+                    {selectedTransaction.creator?.full_name}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Status</p>
-                  {selectedTransaction.status === 'pending' && (
+                  {selectedTransaction.status === "pending" && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                       <Clock className="w-3 h-3 mr-1" />
                       Pending
                     </span>
                   )}
-                  {selectedTransaction.status === 'approved' && (
+                  {selectedTransaction.status === "approved" && (
                     <div>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         <CheckCircle className="w-3 h-3 mr-1" />
@@ -869,7 +1030,7 @@ export default function TransactionsPage() {
                       )}
                     </div>
                   )}
-                  {selectedTransaction.status === 'rejected' && (
+                  {selectedTransaction.status === "rejected" && (
                     <div>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                         <XCircle className="w-3 h-3 mr-1" />
@@ -893,7 +1054,9 @@ export default function TransactionsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
-              <h3 className="text-xl font-bold text-gray-900">Revision History</h3>
+              <h3 className="text-xl font-bold text-gray-900">
+                Revision History
+              </h3>
               <button
                 onClick={() => setShowHistoryModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -903,14 +1066,21 @@ export default function TransactionsPage() {
             </div>
             <div className="p-6">
               {revisions.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">No revisions yet</p>
+                <p className="text-center text-gray-500 py-8">
+                  No revisions yet
+                </p>
               ) : (
                 <div className="space-y-4">
                   {revisions.map((revision) => (
-                    <div key={revision.id} className="border border-gray-200 rounded-lg p-4">
+                    <div
+                      key={revision.id}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <p className="font-medium text-gray-900">{revision.reviser.full_name}</p>
+                          <p className="font-medium text-gray-900">
+                            {revision.reviser.full_name}
+                          </p>
                           <p className="text-sm text-gray-500">
                             {new Date(revision.created_at).toLocaleString()}
                           </p>
@@ -920,8 +1090,12 @@ export default function TransactionsPage() {
                         </span>
                       </div>
                       <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3">
-                        <p className="text-sm font-medium text-yellow-800">Reason:</p>
-                        <p className="text-sm text-yellow-900">{revision.revision_reason}</p>
+                        <p className="text-sm font-medium text-yellow-800">
+                          Reason:
+                        </p>
+                        <p className="text-sm text-yellow-900">
+                          {revision.revision_reason}
+                        </p>
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
@@ -930,7 +1104,9 @@ export default function TransactionsPage() {
                         </div>
                         <div>
                           <p className="text-gray-600">Amount</p>
-                          <p className="font-medium">{formatCurrency(revision.amount)}</p>
+                          <p className="font-medium">
+                            {formatCurrency(revision.amount)}
+                          </p>
                         </div>
                         <div>
                           <p className="text-gray-600">Category</p>
@@ -938,7 +1114,9 @@ export default function TransactionsPage() {
                         </div>
                         <div>
                           <p className="text-gray-600">Date</p>
-                          <p className="font-medium">{formatDate(revision.date)}</p>
+                          <p className="font-medium">
+                            {formatDate(revision.date)}
+                          </p>
                         </div>
                       </div>
                     </div>
